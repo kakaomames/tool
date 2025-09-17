@@ -1,1 +1,147 @@
 
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英単語学習アプリ</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f9; color: #333; line-height: 1.6; }
+        .container { max-width: 800px; margin: 40px auto; padding: 20px; background: #fff; border-radius: 12px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
+        h1, h2 { text-align: center; color: #4a5568; }
+        .tab-menu { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .tab-menu button { padding: 12px 24px; font-size: 16px; border: none; background-color: #e2e8f0; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
+        .tab-menu button.active, .tab-menu button:hover { background-color: #4c51bf; color: #fff; }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+        label { display: block; margin-top: 15px; font-weight: bold; }
+        input[type="text"] { width: 95%; padding: 12px; margin-top: 5px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 16px; }
+        button#register-btn, button#check-btn { width: 100%; padding: 12px; background-color: #48bb78; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 18px; margin-top: 20px; transition: background-color 0.3s; }
+        #register-btn:hover, #check-btn:hover { background-color: #38a169; }
+        #question-word { font-size: 2.5em; text-align: center; margin: 30px 0; font-weight: bold; }
+        #message { text-align: center; font-size: 1.2em; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📝 英単語テストメーカー</h1>
+
+    <div class="tab-menu">
+        <button id="register-tab-btn" class="active">登録</button>
+        <button id="test-tab-btn">テスト</button>
+    </div>
+
+    <div id="register-section" class="content-section active">
+        <h2>単語登録</h2>
+        <form id="register-form">
+            <label for="english">英単語</label>
+            <input type="text" id="english" placeholder="例: apple" required>
+            <label for="japanese">日本語訳</label>
+            <input type="text" id="japanese" placeholder="例: りんご" required>
+            <button type="submit" id="register-btn">登録する</button>
+        </form>
+    </div>
+
+    <div id="test-section" class="content-section">
+        <h2>テスト</h2>
+        <div id="test-area">
+            <p id="question-word">単語を読み込んでいます...</p>
+            <input type="text" id="answer-input" placeholder="日本語訳を入力">
+            <button id="check-btn">回答</button>
+        </div>
+        <div id="message"></div>
+    </div>
+</div>
+
+<script>
+    const registerForm = document.getElementById('register-form');
+    const englishInput = document.getElementById('english');
+    const japaneseInput = document.getElementById('japanese');
+    const testTabBtn = document.getElementById('test-tab-btn');
+    const registerSection = document.getElementById('register-section');
+    const testSection = document.getElementById('test-section');
+    const questionWord = document.getElementById('question-word');
+    const answerInput = document.getElementById('answer-input');
+    const checkBtn = document.getElementById('check-btn');
+    const messageDiv = document.getElementById('message');
+
+    let currentWord = {};
+
+    // 単語をローカルストレージに保存する関数
+    function saveWord(english, japanese) {
+        const words = JSON.parse(localStorage.getItem('words')) || [];
+        words.push({ english: english.toLowerCase().trim(), japanese: japanese.trim() });
+        localStorage.setItem('words', JSON.stringify(words));
+    }
+
+    // フォーム送信時の処理
+    registerForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveWord(englishInput.value, japaneseInput.value);
+        englishInput.value = '';
+        japaneseInput.value = '';
+        alert('単語が登録されました！');
+    });
+
+    // タブ切り替え機能
+    document.querySelectorAll('.tab-menu button').forEach(button => {
+        button.addEventListener('click', () => {
+            document.querySelector('.tab-menu .active').classList.remove('active');
+            button.classList.add('active');
+            document.querySelector('.content-section.active').classList.remove('active');
+            const targetId = button.id.replace('-tab-btn', '-section');
+            document.getElementById(targetId).classList.add('active');
+            if (targetId === 'test-section') {
+                loadNewWord();
+            }
+        });
+    });
+
+    // テスト問題の読み込み
+    function loadNewWord() {
+        const words = JSON.parse(localStorage.getItem('words')) || [];
+        if (words.length === 0) {
+            questionWord.textContent = "単語が登録されていません。";
+            answerInput.style.display = 'none';
+            checkBtn.style.display = 'none';
+            return;
+        }
+        answerInput.style.display = 'block';
+        checkBtn.style.display = 'block';
+        const randomIndex = Math.floor(Math.random() * words.length);
+        currentWord = words[randomIndex];
+        questionWord.textContent = currentWord.english;
+        answerInput.value = '';
+        messageDiv.textContent = '';
+        answerInput.focus();
+    }
+
+    // 回答チェック
+    checkBtn.addEventListener('click', () => {
+        const userAnswer = answerInput.value.trim();
+        if (userAnswer === currentWord.japanese) {
+            messageDiv.textContent = "✅ 正解です！";
+            messageDiv.style.color = 'green';
+        } else {
+            messageDiv.textContent = `❌ 不正解です。正解は「${currentWord.japanese}」でした。`;
+            messageDiv.style.color = 'red';
+        }
+        setTimeout(loadNewWord, 2000);
+    });
+
+    // Enterキーで回答チェック
+    answerInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            checkBtn.click();
+        }
+    });
+
+    // 最初にテストセクションを読み込む
+    loadNewWord();
+
+</script>
+
+</body>
+</html>

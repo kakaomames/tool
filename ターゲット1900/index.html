@@ -28,6 +28,7 @@
         .delete-btn:hover { background-color: #c53030; }
         .edit-btn { background-color: #3182ce; }
         .edit-btn:hover { background-color: #2c5282; }
+        textarea { width: 95%; height: 150px; padding: 12px; margin-top: 5px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 16px; resize: vertical; }
     </style>
 </head>
 <body>
@@ -53,6 +54,12 @@
             <input type="text" id="japanese" placeholder="例: りんご" required>
             <button type="submit">登録する</button>
         </form>
+        <hr style="margin: 40px 0;">
+        <h2>一括登録</h2>
+        <p>単語と日本語訳を「,」または「=」で区切り、1行に1ペアを貼り付けてください。</p>
+        <p style="font-size: 0.9em; color: #666;">例: <br>apple,りんご<br>banana=バナナ</p>
+        <textarea id="bulk-text" placeholder="ここに貼り付け..."></textarea>
+        <button id="bulk-register-btn">一括登録する</button>
     </div>
 
     <div id="test-section" class="content-section">
@@ -104,6 +111,9 @@
     const wordListContainer = document.getElementById('word-list-container');
     const resultsContainer = document.getElementById('results-container');
 
+    const bulkTextarea = document.getElementById('bulk-text');
+    const bulkRegisterBtn = document.getElementById('bulk-register-btn');
+
     let wordsToTest = [];
     let correctAnswers = 0;
     let totalQuestions = 0;
@@ -133,6 +143,41 @@
         alert('単語が登録されました！');
         renderGroupCheckboxes();
         renderWordList();
+    });
+
+    // 一括登録ボタンの処理
+    bulkRegisterBtn.addEventListener('click', () => {
+        const groupName = groupNameInput.value.trim();
+        if (!groupName) {
+            alert('グループ名を入力してください。');
+            return;
+        }
+
+        const lines = bulkTextarea.value.split('\n').filter(line => line.trim() !== '');
+        let count = 0;
+        lines.forEach(line => {
+            let parts;
+            if (line.includes(',')) {
+                parts = line.split(',');
+            } else if (line.includes('=')) {
+                parts = line.split('=');
+            } else {
+                return; // 有効な区切り文字がない行はスキップ
+            }
+            if (parts.length === 2) {
+                saveWord(groupName, parts[0], parts[1]);
+                count++;
+            }
+        });
+        
+        if (count > 0) {
+            alert(`${count}個の単語が一括登録されました！`);
+            bulkTextarea.value = '';
+            renderGroupCheckboxes();
+            renderWordList();
+        } else {
+            alert('有効な単語ペアが見つかりませんでした。');
+        }
     });
 
     // タブ切り替え機能

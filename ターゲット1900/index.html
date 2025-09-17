@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -16,10 +15,12 @@
         .content-section.active { display: block; }
         label { display: block; margin-top: 15px; font-weight: bold; }
         input[type="text"] { width: 95%; padding: 12px; margin-top: 5px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 16px; }
-        button#register-btn, button#check-btn { width: 100%; padding: 12px; background-color: #48bb78; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 18px; margin-top: 20px; transition: background-color 0.3s; }
-        #register-btn:hover, #check-btn:hover { background-color: #38a169; }
+        button { width: 100%; padding: 12px; background-color: #48bb78; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 18px; margin-top: 20px; transition: background-color 0.3s; }
+        button:hover { background-color: #38a169; }
         #question-word { font-size: 2.5em; text-align: center; margin: 30px 0; font-weight: bold; }
         #message { text-align: center; font-size: 1.2em; margin-top: 20px; }
+        #group-selection { margin-bottom: 20px; text-align: left; }
+        .group-checkbox { margin-right: 10px; }
     </style>
 </head>
 <body>
@@ -35,17 +36,23 @@
     <div id="register-section" class="content-section active">
         <h2>単語登録</h2>
         <form id="register-form">
+            <label for="group-name">グループ名</label>
+            <input type="text" id="group-name" placeholder="例: 小テスト1" required>
             <label for="english">英単語</label>
             <input type="text" id="english" placeholder="例: apple" required>
             <label for="japanese">日本語訳</label>
             <input type="text" id="japanese" placeholder="例: りんご" required>
-            <button type="submit" id="register-btn">登録する</button>
+            <button type="submit">登録する</button>
         </form>
     </div>
 
     <div id="test-section" class="content-section">
         <h2>テスト</h2>
-        <div id="test-area">
+        <div id="group-selection">
+            <p>テストするグループを選択してください：</p>
+            </div>
+        <button id="start-test-btn">テスト開始</button>
+        <div id="test-area" style="display:none;">
             <p id="question-word">単語を読み込んでいます...</p>
             <input type="text" id="answer-input" placeholder="日本語訳を入力">
             <button id="check-btn">回答</button>
@@ -56,32 +63,46 @@
 
 <script>
     const registerForm = document.getElementById('register-form');
+    const groupNameInput = document.getElementById('group-name');
     const englishInput = document.getElementById('english');
     const japaneseInput = document.getElementById('japanese');
     const testTabBtn = document.getElementById('test-tab-btn');
     const registerSection = document.getElementById('register-section');
     const testSection = document.getElementById('test-section');
+    const groupSelectionDiv = document.getElementById('group-selection');
+    const startTestBtn = document.getElementById('start-test-btn');
+    const testArea = document.getElementById('test-area');
     const questionWord = document.getElementById('question-word');
     const answerInput = document.getElementById('answer-input');
     const checkBtn = document.getElementById('check-btn');
     const messageDiv = document.getElementById('message');
 
+    let wordsToTest = [];
     let currentWord = {};
 
-    // 単語をローカルストレージに保存する関数
-    function saveWord(english, japanese) {
-        const words = JSON.parse(localStorage.getItem('words')) || [];
-        words.push({ english: english.toLowerCase().trim(), japanese: japanese.trim() });
-        localStorage.setItem('words', JSON.stringify(words));
+    // 単語をグループごとにローカルストレージに保存する関数
+    function saveWord(groupName, english, japanese) {
+        let groups = JSON.parse(localStorage.getItem('wordGroups')) || [];
+        let group = groups.find(g => g.name === groupName);
+
+        if (!group) {
+            group = { name: groupName, words: [] };
+            groups.push(group);
+        }
+
+        group.words.push({ english: english.toLowerCase().trim(), japanese: japanese.trim() });
+        localStorage.setItem('wordGroups', JSON.stringify(groups));
     }
 
     // フォーム送信時の処理
     registerForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        saveWord(englishInput.value, japaneseInput.value);
+        saveWord(groupNameInput.value, englishInput.value, japaneseInput.value);
+        groupNameInput.value = '';
         englishInput.value = '';
         japaneseInput.value = '';
         alert('単語が登録されました！');
+        renderGroupCheckboxes();
     });
 
     // タブ切り替え機能
@@ -93,24 +114,78 @@
             const targetId = button.id.replace('-tab-btn', '-section');
             document.getElementById(targetId).classList.add('active');
             if (targetId === 'test-section') {
-                loadNewWord();
+                renderGroupCheckboxes();
             }
         });
     });
 
-    // テスト問題の読み込み
-    function loadNewWord() {
-        const words = JSON.parse(localStorage.getItem('words')) || [];
-        if (words.length === 0) {
-            questionWord.textContent = "単語が登録されていません。";
-            answerInput.style.display = 'none';
-            checkBtn.style.display = 'none';
+    // グループ選択用のチェックボックスを生成する
+    function renderGroupCheckboxes() {
+        groupSelectionDiv.innerHTML = '<p>テストするグループを選択してください：</p>';
+        const groups = JSON.parse(localStorage.getItem('wordGroups')) || [];
+        if (groups.length === 0) {
+            groupSelectionDiv.innerHTML += '<p>まだグループがありません。</p>';
+            startTestBtn.style.display = 'none';
             return;
         }
-        answerInput.style.display = 'block';
-        checkBtn.style.display = 'block';
-        const randomIndex = Math.floor(Math.random() * words.length);
-        currentWord = words[randomIndex];
+        startTestBtn.style.display = 'block';
+        groups.forEach(group => {
+            const label = document.createElement('label');
+            label.innerHTML = `<input type="checkbox" class="group-checkbox" value="${group.name}"> ${group.name} (${group.words.length}単語)`;
+            groupSelectionDiv.appendChild(label);
+        });
+    }
+
+    // テスト開始ボタンの処理
+    startTestBtn.addEventListener('click', () => {
+        const selectedGroupNames = Array.from(document.querySelectorAll('.group-checkbox:checked')).map(cb => cb.value);
+        if (selectedGroupNames.length === 0) {
+            alert('テストするグループを1つ以上選択してください。');
+            return;
+        }
+
+        const groups = JSON.parse(localStorage.getItem('wordGroups')) || [];
+        wordsToTest = [];
+        selectedGroupNames.forEach(name => {
+            const group = groups.find(g => g.name === name);
+            if (group) {
+                wordsToTest = wordsToTest.concat(group.words);
+            }
+        });
+
+        if (wordsToTest.length === 0) {
+            alert('選択されたグループに単語がありません。');
+            return;
+        }
+
+        testArea.style.display = 'block';
+        startTestBtn.style.display = 'none';
+        groupSelectionDiv.style.display = 'none';
+        
+        wordsToTest = shuffleArray(wordsToTest);
+        loadNewWord();
+    });
+
+    // 配列をシャッフルする関数
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    // テスト問題の読み込み
+    function loadNewWord() {
+        if (wordsToTest.length === 0) {
+            questionWord.textContent = "テスト終了です！🎉";
+            answerInput.style.display = 'none';
+            checkBtn.style.display = 'none';
+            messageDiv.textContent = '';
+            return;
+        }
+
+        currentWord = wordsToTest.pop();
         questionWord.textContent = currentWord.english;
         answerInput.value = '';
         messageDiv.textContent = '';
@@ -119,8 +194,8 @@
 
     // 回答チェック
     checkBtn.addEventListener('click', () => {
-        const userAnswer = answerInput.value.trim();
-        if (userAnswer === currentWord.japanese) {
+        const userAnswer = answerInput.value.trim().toLowerCase(); // 大文字小文字を区別しない
+        if (userAnswer === currentWord.japanese.toLowerCase()) {
             messageDiv.textContent = "✅ 正解です！";
             messageDiv.style.color = 'green';
         } else {
@@ -138,8 +213,10 @@
         }
     });
 
-    // 最初にテストセクションを読み込む
-    loadNewWord();
+    // ページ読み込み時にグループのチェックボックスを生成
+    document.addEventListener('DOMContentLoaded', () => {
+        renderGroupCheckboxes();
+    });
 
 </script>
 

@@ -6,7 +6,7 @@
     <title>英単語学習アプリ</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f9; color: #333; line-height: 1.6; }
-        .container { max-width: 800px; margin: 40px auto; padding: 20px; background: #fff; border-radius: 12px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
+        .container { max-width: 900px; margin: 40px auto; padding: 20px; background: #fff; border-radius: 12px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08); }
         h1, h2 { text-align: center; color: #4a5568; }
         .tab-menu { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
         .tab-menu button { padding: 12px 24px; font-size: 16px; border: none; background-color: #e2e8f0; border-radius: 8px; cursor: pointer; transition: background-color 0.3s; }
@@ -17,10 +17,17 @@
         input[type="text"] { width: 95%; padding: 12px; margin-top: 5px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 16px; }
         button { width: 100%; padding: 12px; background-color: #48bb78; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 18px; margin-top: 20px; transition: background-color 0.3s; }
         button:hover { background-color: #38a169; }
+        .btn-small { width: auto; padding: 8px 12px; font-size: 14px; margin-top: 0; }
         #question-word { font-size: 2.5em; text-align: center; margin: 30px 0; font-weight: bold; }
         #message { text-align: center; font-size: 1.2em; margin-top: 20px; }
-        #group-selection { margin-bottom: 20px; text-align: left; }
-        .group-checkbox { margin-right: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border: 1px solid #e2e8f0; text-align: left; }
+        th { background-color: #edf2f7; font-weight: bold; }
+        .action-btns { display: flex; gap: 5px; }
+        .delete-btn { background-color: #e53e3e; }
+        .delete-btn:hover { background-color: #c53030; }
+        .edit-btn { background-color: #3182ce; }
+        .edit-btn:hover { background-color: #2c5282; }
     </style>
 </head>
 <body>
@@ -31,6 +38,7 @@
     <div class="tab-menu">
         <button id="register-tab-btn" class="active">登録</button>
         <button id="test-tab-btn">テスト</button>
+        <button id="word-list-tab-btn">単語一覧</button>
     </div>
 
     <div id="register-section" class="content-section active">
@@ -50,7 +58,7 @@
         <h2>テスト</h2>
         <div id="group-selection">
             <p>テストするグループを選択してください：</p>
-            </div>
+        </div>
         <button id="start-test-btn">テスト開始</button>
         <div id="test-area" style="display:none;">
             <p id="question-word">単語を読み込んでいます...</p>
@@ -58,6 +66,12 @@
             <button id="check-btn">回答</button>
         </div>
         <div id="message"></div>
+    </div>
+
+    <div id="word-list-section" class="content-section">
+        <h2>単語一覧・編集・削除</h2>
+        <div id="word-list-container">
+            </div>
     </div>
 </div>
 
@@ -67,8 +81,10 @@
     const englishInput = document.getElementById('english');
     const japaneseInput = document.getElementById('japanese');
     const testTabBtn = document.getElementById('test-tab-btn');
+    const wordListTabBtn = document.getElementById('word-list-tab-btn');
     const registerSection = document.getElementById('register-section');
     const testSection = document.getElementById('test-section');
+    const wordListSection = document.getElementById('word-list-section');
     const groupSelectionDiv = document.getElementById('group-selection');
     const startTestBtn = document.getElementById('start-test-btn');
     const testArea = document.getElementById('test-area');
@@ -76,6 +92,7 @@
     const answerInput = document.getElementById('answer-input');
     const checkBtn = document.getElementById('check-btn');
     const messageDiv = document.getElementById('message');
+    const wordListContainer = document.getElementById('word-list-container');
 
     let wordsToTest = [];
     let currentWord = {};
@@ -103,6 +120,7 @@
         japaneseInput.value = '';
         alert('単語が登録されました！');
         renderGroupCheckboxes();
+        renderWordList();
     });
 
     // タブ切り替え機能
@@ -115,6 +133,8 @@
             document.getElementById(targetId).classList.add('active');
             if (targetId === 'test-section') {
                 renderGroupCheckboxes();
+            } else if (targetId === 'word-list-section') {
+                renderWordList();
             }
         });
     });
@@ -194,7 +214,7 @@
 
     // 回答チェック
     checkBtn.addEventListener('click', () => {
-        const userAnswer = answerInput.value.trim().toLowerCase(); // 大文字小文字を区別しない
+        const userAnswer = answerInput.value.trim().toLowerCase();
         if (userAnswer === currentWord.japanese.toLowerCase()) {
             messageDiv.textContent = "✅ 正解です！";
             messageDiv.style.color = 'green';
@@ -213,7 +233,89 @@
         }
     });
 
-    // ページ読み込み時にグループのチェックボックスを生成
+    // 単語一覧の表示
+    function renderWordList() {
+        wordListContainer.innerHTML = '';
+        const groups = JSON.parse(localStorage.getItem('wordGroups')) || [];
+        if (groups.length === 0) {
+            wordListContainer.innerHTML = '<p>登録されている単語はありません。</p>';
+            return;
+        }
+
+        groups.forEach(group => {
+            const groupDiv = document.createElement('div');
+            groupDiv.innerHTML = `<h3>${group.name}</h3>`;
+            const table = document.createElement('table');
+            table.innerHTML = `<thead><tr><th>英単語</th><th>日本語訳</th><th>アクション</th></tr></thead><tbody></tbody>`;
+            const tbody = table.querySelector('tbody');
+
+            group.words.forEach((word, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${word.english}</td>
+                    <td>${word.japanese}</td>
+                    <td class="action-btns">
+                        <button class="edit-btn btn-small" data-group="${group.name}" data-index="${index}">編集</button>
+                        <button class="delete-btn btn-small" data-group="${group.name}" data-index="${index}">削除</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            groupDiv.appendChild(table);
+            wordListContainer.appendChild(groupDiv);
+        });
+
+        // 削除ボタンと編集ボタンのイベントリスナーを設定
+        document.querySelectorAll('.delete-btn').forEach(button => {
+            button.addEventListener('click', deleteWord);
+        });
+        document.querySelectorAll('.edit-btn').forEach(button => {
+            button.addEventListener('click', editWord);
+        });
+    }
+
+    // 単語の削除機能
+    function deleteWord(e) {
+        if (!confirm('本当に削除しますか？')) {
+            return;
+        }
+        const groupName = e.target.dataset.group;
+        const index = e.target.dataset.index;
+        let groups = JSON.parse(localStorage.getItem('wordGroups')) || [];
+        const group = groups.find(g => g.name === groupName);
+        if (group) {
+            group.words.splice(index, 1);
+            if (group.words.length === 0) {
+                groups = groups.filter(g => g.name !== groupName);
+            }
+            localStorage.setItem('wordGroups', JSON.stringify(groups));
+            renderWordList();
+            renderGroupCheckboxes();
+        }
+    }
+
+    // 単語の編集機能
+    function editWord(e) {
+        const groupName = e.target.dataset.group;
+        const index = e.target.dataset.index;
+        let groups = JSON.parse(localStorage.getItem('wordGroups')) || [];
+        const group = groups.find(g => g.name === groupName);
+
+        if (group) {
+            const wordToEdit = group.words[index];
+            const newEnglish = prompt("新しい英単語を入力してください:", wordToEdit.english);
+            if (newEnglish === null) return;
+            const newJapanese = prompt("新しい日本語訳を入力してください:", wordToEdit.japanese);
+            if (newJapanese === null) return;
+
+            group.words[index].english = newEnglish.toLowerCase().trim();
+            group.words[index].japanese = newJapanese.trim();
+            localStorage.setItem('wordGroups', JSON.stringify(groups));
+            renderWordList();
+        }
+    }
+
+    // ページ読み込み時の処理
     document.addEventListener('DOMContentLoaded', () => {
         renderGroupCheckboxes();
     });

@@ -39,6 +39,7 @@
         <button id="register-tab-btn" class="active">登録</button>
         <button id="test-tab-btn">テスト</button>
         <button id="word-list-tab-btn">単語一覧</button>
+        <button id="results-tab-btn">結果</button>
     </div>
 
     <div id="register-section" class="content-section active">
@@ -73,6 +74,12 @@
         <div id="word-list-container">
             </div>
     </div>
+
+    <div id="results-section" class="content-section">
+        <h2>テスト結果</h2>
+        <div id="results-container">
+            </div>
+    </div>
 </div>
 
 <script>
@@ -82,9 +89,11 @@
     const japaneseInput = document.getElementById('japanese');
     const testTabBtn = document.getElementById('test-tab-btn');
     const wordListTabBtn = document.getElementById('word-list-tab-btn');
+    const resultsTabBtn = document.getElementById('results-tab-btn');
     const registerSection = document.getElementById('register-section');
     const testSection = document.getElementById('test-section');
     const wordListSection = document.getElementById('word-list-section');
+    const resultsSection = document.getElementById('results-section');
     const groupSelectionDiv = document.getElementById('group-selection');
     const startTestBtn = document.getElementById('start-test-btn');
     const testArea = document.getElementById('test-area');
@@ -93,9 +102,12 @@
     const checkBtn = document.getElementById('check-btn');
     const messageDiv = document.getElementById('message');
     const wordListContainer = document.getElementById('word-list-container');
+    const resultsContainer = document.getElementById('results-container');
 
     let wordsToTest = [];
-    let currentWord = {};
+    let correctAnswers = 0;
+    let totalQuestions = 0;
+    let selectedGroupNamesForTest = [];
 
     // 単語をグループごとにローカルストレージに保存する関数
     function saveWord(groupName, english, japanese) {
@@ -135,6 +147,8 @@
                 renderGroupCheckboxes();
             } else if (targetId === 'word-list-section') {
                 renderWordList();
+            } else if (targetId === 'results-section') {
+                renderResults();
             }
         });
     });
@@ -158,15 +172,15 @@
 
     // テスト開始ボタンの処理
     startTestBtn.addEventListener('click', () => {
-        const selectedGroupNames = Array.from(document.querySelectorAll('.group-checkbox:checked')).map(cb => cb.value);
-        if (selectedGroupNames.length === 0) {
+        selectedGroupNamesForTest = Array.from(document.querySelectorAll('.group-checkbox:checked')).map(cb => cb.value);
+        if (selectedGroupNamesForTest.length === 0) {
             alert('テストするグループを1つ以上選択してください。');
             return;
         }
 
         const groups = JSON.parse(localStorage.getItem('wordGroups')) || [];
         wordsToTest = [];
-        selectedGroupNames.forEach(name => {
+        selectedGroupNamesForTest.forEach(name => {
             const group = groups.find(g => g.name === name);
             if (group) {
                 wordsToTest = wordsToTest.concat(group.words);
@@ -183,6 +197,8 @@
         groupSelectionDiv.style.display = 'none';
         
         wordsToTest = shuffleArray(wordsToTest);
+        totalQuestions = wordsToTest.length;
+        correctAnswers = 0;
         loadNewWord();
     });
 
@@ -202,6 +218,13 @@
             answerInput.style.display = 'none';
             checkBtn.style.display = 'none';
             messageDiv.textContent = '';
+            
+            saveTestResult(); // テスト結果を保存
+            
+            // 再びテストを開始できるようにUIを元に戻す
+            startTestBtn.style.display = 'block';
+            groupSelectionDiv.style.display = 'block';
+            testArea.style.display = 'none';
             return;
         }
 
@@ -218,12 +241,53 @@
         if (userAnswer === currentWord.japanese.toLowerCase()) {
             messageDiv.textContent = "✅ 正解です！";
             messageDiv.style.color = 'green';
+            correctAnswers++;
         } else {
             messageDiv.textContent = `❌ 不正解です。正解は「${currentWord.japanese}」でした。`;
             messageDiv.style.color = 'red';
         }
         setTimeout(loadNewWord, 2000);
     });
+
+    // テスト結果を保存する
+    function saveTestResult() {
+        const results = JSON.parse(localStorage.getItem('testResults')) || [];
+        const score = totalQuestions > 0 ? (correctAnswers / totalQuestions * 100).toFixed(1) : 0;
+        const result = {
+            date: new Date().toLocaleString(),
+            groups: selectedGroupNamesForTest.join(', '),
+            total: totalQuestions,
+            correct: correctAnswers,
+            score: score + '%'
+        };
+        results.push(result);
+        localStorage.setItem('testResults', JSON.stringify(results));
+    }
+
+    // テスト結果の表示
+    function renderResults() {
+        resultsContainer.innerHTML = '';
+        const results = JSON.parse(localStorage.getItem('testResults')) || [];
+        if (results.length === 0) {
+            resultsContainer.innerHTML = '<p>まだテスト結果がありません。</p>';
+            return;
+        }
+        const table = document.createElement('table');
+        table.innerHTML = `<thead><tr><th>日時</th><th>グループ</th><th>正解数</th><th>総問題数</th><th>正解率</th></tr></thead><tbody></tbody>`;
+        const tbody = table.querySelector('tbody');
+        results.forEach(result => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${result.date}</td>
+                <td>${result.groups}</td>
+                <td>${result.correct}</td>
+                <td>${result.total}</td>
+                <td>${result.score}</td>
+            `;
+            tbody.appendChild(row);
+        });
+        resultsContainer.appendChild(table);
+    }
 
     // Enterキーで回答チェック
     answerInput.addEventListener('keydown', (e) => {
